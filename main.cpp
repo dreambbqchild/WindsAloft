@@ -191,15 +191,14 @@ unordered_map<string, double> ParseGrib(int forecastIndex, double lat, double lo
 	
 	auto pipe = popen(stream.str().c_str(), "r");
 	
-	while ( (c = fgetc(pipe)) != EOF) {
+	while ((c = fgetc(pipe)) != EOF)
 		buffer << (char)c;
-	}
+
 	pclose(pipe);	
 	
-	for (string line; getline(buffer, line); ) {
+	for (string line; getline(buffer, line); )
         ForecastDataFromLine(forecastIndex, line, forecastData);
-    }
-	
+
 	return forecastData;
 }
 
@@ -286,8 +285,8 @@ int main(int argc, char* argv[])
 		result["nmDistance"] = (line.Distance() * 0.000539957);
 		
 		int num = int(ceil(line.Distance() / segmentLength));
-		for (int checkpointIndex = 1; checkpointIndex < num; checkpointIndex++) {
-			
+		for (int checkpointIndex = 1; checkpointIndex < num; checkpointIndex++) 
+		{	
 			double lat, lon;
 			line.Position(checkpointIndex * segmentLength, lat, lon);
 			pathData << lat << "," << lon << " ";
@@ -298,7 +297,8 @@ int main(int argc, char* argv[])
 
 		result["pathData"] = pathData.str();
 		
-		for(auto i = 0; i < FORECAST_HOURS; i++) {
+		for(auto i = 0; i < FORECAST_HOURS; i++) 
+		{
 			AddCheckpointValue(i, num, trueAirspeedAtCruise, lat2, lon2);
 			auto time = checkpointForecast[i]["time"].asString();
 			result["forecasts"][time] = checkpointForecast[i];
@@ -306,11 +306,9 @@ int main(int argc, char* argv[])
 		
 		Json::FastWriter writer;
 		
-		// ofstream ofs (fileName.str(), ofstream::out);
-		// ofs << writer.write(result);
-		// ofs.close();
-
-		cout << writer.write(result);
+		ofstream ofs (fileName.str(), ofstream::out);
+		ofs << writer.write(result);
+		ofs.close();
 		
 		PrintJSON(fileName.str());
 	} catch (const exception& e) {
