@@ -100,7 +100,7 @@ void ForecastDataFromLine(int forecastIndex, string line, unordered_map<string, 
 			checkpointForecast[forecastIndex]["time"] = token.substr(9);
 			checkpointForecast[forecastIndex]["checkpoints"] = checkpoints;
 		}
-		else if(token == "UGRD" || token == "VGRD" || token == "TMP")
+		else if(token == "UGRD" || token == "VGRD" || token == "TMP" || token == "MSLET")
 			keyPrefix = token;
 		else if(keyPrefix.length() && !keySuffix.length())
 			keySuffix = token;
@@ -128,6 +128,11 @@ double KelvinToCelcius(double tmp)
 	return tmp - 273.15;
 }
 
+double PascalsToInHg(double pressure)
+{
+	return pressure / 3386.389;
+}
+
 double WindCorrectionAngle(double windDirection, double windSpeed, double trueAirspeed, double trueCourse)
 {
 	trueCourse += 180;
@@ -152,6 +157,7 @@ Json::Value CheckpointData(unordered_map<string, double>& values, string key, do
 	auto u = values["UGRD:" + key];
 	auto v = values["VGRD:" + key];
 	auto t = values["TMP:" + key];
+	auto p = values["MSLET:" + key];
 	auto windDirection = WindDirection(u, v);
 	auto iWindDirection = (int)round(windDirection);
 	auto windSpeed = WindSpeed(u, v);
@@ -159,6 +165,8 @@ Json::Value CheckpointData(unordered_map<string, double>& values, string key, do
 	data["windDirection"] = iWindDirection == 0 ? 360 : iWindDirection;
 	data["windSpeed"] = (int)round(windSpeed);
 	data["temperature"] = (int)round(KelvinToCelcius(t));
+	data["pressure"] = PascalsToInHg(p);
+	
 	if(trueCourse)
 	{
 		double windCorrectionAngle = WindCorrectionAngle(windDirection, windSpeed, trueAirspeed, *trueCourse);
