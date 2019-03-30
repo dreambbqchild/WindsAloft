@@ -5,6 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <experimental/filesystem>
 #include <stdlib.h>
 #include <GeographicLib/Geodesic.hpp>
@@ -19,13 +20,6 @@ namespace fs = std::experimental::filesystem;
 
 Json::Value airports;
 
-#define _3000 "900 mb"
-#define _5000 "850 mb"
-#define _6000 "1829 m above mean sea level"
-#define _7000 "800 mb"
-#define _8000 "750 mb"
-#define _9000 "2743 m above mean sea level"
-
 #define FORECAST_HOURS 14
 
 const double segmentLength = 1852 * 10;//10 intervals after m to nm conversion.
@@ -33,6 +27,8 @@ const double segmentLength = 1852 * 10;//10 intervals after m to nm conversion.
 Geodesic geod(Constants::WGS84_a(), Constants::WGS84_f());
 
 Json::Value checkpointForecast[FORECAST_HOURS]; 
+
+unordered_set<string> keyMaster;
 
 string GetDecodedValue(CURL *curl, string value)
 {
@@ -98,12 +94,12 @@ void ForecastDataFromLine(int forecastIndex, string line, unordered_map<string, 
 		if(!checkpointForecast[forecastIndex] && token.find("start_ft") == 0) {
 			Json::Value checkpoints(Json::arrayValue); 
 			checkpointForecast[forecastIndex]["time"] = token.substr(9);
-			checkpointForecast[forecastIndex]["checkpoints"] = checkpoints;
+			checkpointForecast[forecastIndex]["checkpts"] = checkpoints;
 		}
 		else if(token == "UGRD" || token == "VGRD" || token == "TMP" || token == "MSLET")
 			keyPrefix = token;
 		else if(keyPrefix.length() && !keySuffix.length())
-			keySuffix = token;
+			keyMaster.emplace(keySuffix = token);
 		else if(auto equals = token.find_last_of("="))
 			value = atof(token.substr(equals + 1).c_str());
 	}
@@ -133,6 +129,21 @@ double PascalsToInHg(double pressure)
 	return pressure / 3386.389;
 }
 
+double MillibarsToInHg(double pressure)
+{
+	return pressure / 33.86389;
+}
+
+string MillibarLabelToInHgLabel(string label)
+{
+	stringstream stream;
+	auto value = atof(label.substr(0, label.length() - 3).c_str());
+	value = MillibarsToInHg(value);
+	
+	stream << fixed << setprecision(2) << value;
+	return stream.str();
+}
+
 double WindCorrectionAngle(double windDirection, double windSpeed, double trueAirspeed, double trueCourse)
 {
 	trueCourse += 180;
@@ -157,21 +168,20 @@ Json::Value CheckpointData(unordered_map<string, double>& values, string key, do
 	auto u = values["UGRD:" + key];
 	auto v = values["VGRD:" + key];
 	auto t = values["TMP:" + key];
-	auto p = values["MSLET:" + key];
 	auto windDirection = WindDirection(u, v);
 	auto iWindDirection = (int)round(windDirection);
 	auto windSpeed = WindSpeed(u, v);
 	
-	data["windDirection"] = iWindDirection == 0 ? 360 : iWindDirection;
-	data["windSpeed"] = (int)round(windSpeed);
-	data["temperature"] = (int)round(KelvinToCelcius(t));
-	data["pressure"] = PascalsToInHg(p);
+	data["windDir"] = iWindDirection == 0 ? 360 : iWindDirection;
+	data["windSpd"] = (int)round(windSpeed);
+	data["temp"] = (int)round(KelvinToCelcius(t));
 	
 	if(trueCourse)
 	{
 		double windCorrectionAngle = WindCorrectionAngle(windDirection, windSpeed, trueAirspeed, *trueCourse);
-		data["windCorrectionAngle"] = (int)round(windCorrectionAngle); 
-		data["groundSpeed"] = (int)round(GroundSpeed(windCorrectionAngle, windSpeed, trueAirspeed));
+		data["WCA"] = (int)round(windCorrectionAngle);
+		data["trueHdg"] = (int)(round(windCorrectionAngle) + *trueCourse) % 360;		
+		data["groundSpd"] = (int)round(GroundSpeed(windCorrectionAngle, windSpeed, trueAirspeed));
 	}
 	
 	return data;
@@ -215,20 +225,25 @@ Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double tr
 	auto values = ParseGrib(forecastIndex, lat, lon);
 	Json::Value obj;
 
-	obj["latitude"] = lat;
-	obj["longitude"] = lon;
+	obj["lat"] = lat;
+	obj["long"] = lon;
 	
 	if(trueCourse)
 		obj["trueCourse"] = (int)round(*trueCourse);
-	
-	obj["3000"] = CheckpointData(values, _3000, trueAirspeed, trueCourse);
-	obj["5000"] = CheckpointData(values, _5000, trueAirspeed, trueCourse);
-	obj["6000"] = CheckpointData(values, _6000, trueAirspeed, trueCourse);
-	obj["7000"] = CheckpointData(values, _7000, trueAirspeed, trueCourse);
-	obj["8000"] = CheckpointData(values, _8000, trueAirspeed, trueCourse);
-	obj["9000"] = CheckpointData(values, _9000, trueAirspeed, trueCourse);	
-	
-	checkpointForecast[forecastIndex]["checkpoints"][checkpointIndex] = obj;	
+
+	obj["inHg"] = PascalsToInHg(values["MSLET:mean sea level"]);
+	for(auto itr = keyMaster.begin(); itr != keyMaster.end(); itr++)
+	{
+		if(*itr == "mean sea level")
+			continue;
+		
+		auto label = *itr;
+		if(label.find(" mb") == label.length() - 3)
+			label = MillibarLabelToInHgLabel(label);
+		
+		obj[label] = CheckpointData(values, *itr, trueAirspeed, trueCourse);
+	}		
+	checkpointForecast[forecastIndex]["checkpts"][checkpointIndex] = obj;	
 	
 	return obj;
 }
@@ -277,7 +292,7 @@ int main(int argc, char* argv[])
 		LoadAirports();
 		Json::Value result;
 		stringstream pathData;
-		
+
 		result["from"] = queryString["from"];
 		result["to"] = queryString["to"];
 				
