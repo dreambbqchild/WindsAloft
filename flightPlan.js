@@ -1,18 +1,28 @@
 class FlightPlan {
 	model = {};
+	from = ''; 
+	to = ''; 
+	trueAirspeed = 0;
 	
 	constructor(from, to, trueAirspeed) {
-		var request = new XMLHttpRequest();
+		this.from = from;
+		this.to = to;
+		this.trueAirspeed = trueAirspeed;
 		var self = this;
-		request.addEventListener("load", function() {
-			self.model = JSON.parse(request.responseText);
+		
+		this.httpRequest = new Promise(function(resolve) {
+			var request = new XMLHttpRequest();
+			request.addEventListener("load", function() {
+				self.model = JSON.parse(request.responseText);
+				resolve(self);
+			});
+			request.open("GET", `cgi-bin/flightPlan.sh?from=${from}&to=${to}&trueAirspeed.cruise=${trueAirspeed}`);
+			request.send();
 		});
-		request.open("GET", `cgi-bin/flightPlan.sh?from=${from}&to=${to}&trueAirspeed.cruise=${trueAirspeed}`);
-		request.send();
 	}
 	
 	numberOfCheckpoints() {
-		return model.forecasts[0].checkpts.length;
+		return this.model.forecasts[0].checkpts.length;
 	}
 	
 	interoplate(altitude, altitudeLow, low, altitudeHigh, high) {
@@ -57,9 +67,12 @@ class FlightPlan {
 		var result = this.interoplate(altitude, altitudeLow, checkpoint.altitudes[altitudeLow], altitudeHigh, checkpoint.altitudes[altitudeHigh]);
 		result.trueCourse = metadata.trueCourse;
 		result.trueHeading = (result.windCorrectionAngle + metadata.trueCourse) % 360;
+		result.magneticVariation = metadata.magVar;
 		result.magneticHeading = (result.trueHeading + metadata.magVar) % 360;
 		result.latitude = metadata.lat;
 		result.longitude = metadata['long'];
+		result.distanceTraveled = Math.round(this.model.nmDistance - (checkpointIndex * 10));
+		result.distanceToGo = Math.round(this.model.nmDistance - result.distanceTraveled);
 		return result;
 	}
 }

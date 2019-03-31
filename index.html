@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title></title>
+		<style>
+			table {text-align: center;}
+		</style>
+	</head>
+	<body>		
+		<script type="text/javascript" src="./scripts/flightPlan.js"></script>
+		<script type="text/javascript" src="./scripts/flightPlanView.js"></script>
+		<script type="text/javascript">	
+			var flightPlan = new FlightPlan('KFCM', 'KMCD', 110);
+			
+			flightPlan.httpRequest.then(function() {
+				var view = new FlightPlanView(flightPlan);
+				var table = document.querySelector('table');
+				for(var i = 0; i < flightPlan.numberOfCheckpoints() - 1; i++) {
+					view.getTableRows(0, i, 4000).forEach(row => table.appendChild(row));
+				}
+			});
+		</script>
+	</body>
+	<table border="1">
+	<tr>
+		<td rowspan="2">Altitude</td>
+		<td>Wind Dir</td>
+		<td>Wind Speed</td>
+		<td rowspan="2">True<br/>Airspeed</td>
+		<td rowspan="2">Ground<br/>Speed</td>
+		<td>TC</td>
+		<td>TH</td>
+		<td>MH</td>
+		<td>Dist. Traveled</td>
+	</tr>
+	<tr>
+		<td colspan="2">Temp</td>
+		<td>Wind +/-</td>
+		<td>Var +/-</td>
+		<td></td>
+		<td>Dist. To Go</td>
+	</tr>
+	</table>
+	<p>
+		*Off by 1 errors due to rounding of double math
+	</p>
+</html>
