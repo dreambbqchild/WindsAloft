@@ -177,31 +177,6 @@ double GroundSpeed(double windCorrectionAngle, double windSpeed, double trueAirs
 	return cos(windCorrectionAngle) * trueAirspeed + windSpeed;
 }
 
-Json::Value CheckpointData(unordered_map<string, double>& values, string key, double trueAirspeed, double* trueCourse)
-{	
-	Json::Value data;
-	auto u = values["UGRD:" + key];
-	auto v = values["VGRD:" + key];
-	auto t = values["TMP:" + key];
-	auto windDirection = WindDirection(u, v);
-	auto iWindDirection = (int)round(windDirection);
-	auto windSpeed = WindSpeed(u, v);
-	
-	data["windDir"] = iWindDirection == 0 ? 360 : iWindDirection;
-	data["windSpd"] = (int)round(windSpeed);
-	data["temp"] = (int)round(KelvinToCelcius(t));
-	
-	if(trueCourse)
-	{
-		double windCorrectionAngle = WindCorrectionAngle(windDirection, windSpeed, trueAirspeed, *trueCourse);
-		data["WCA"] = (int)round(windCorrectionAngle);
-		data["trueHdg"] = (int)(round(windCorrectionAngle) + *trueCourse) % 360;		
-		data["groundSpd"] = (int)round(GroundSpeed(windCorrectionAngle, windSpeed, trueAirspeed));
-	}
-	
-	return data;
-}
-
 double TrueCourse(double lat1, double lon1, const GeodesicLine& line, int checkpointIndex)
 {	
 	double lat2, lon2;
@@ -235,6 +210,30 @@ unordered_map<string, double> ParseGrib(int forecastIndex, double lat, double lo
 	return forecastData;
 }
 
+Json::Value CheckpointData(unordered_map<string, double>& values, string key, double trueAirspeed, double* trueCourse)
+{	
+	Json::Value data;
+	auto u = values["UGRD:" + key];
+	auto v = values["VGRD:" + key];
+	auto t = values["TMP:" + key];
+	auto windDirection = WindDirection(u, v);
+	auto iWindDirection = (int)round(windDirection);
+	auto windSpeed = WindSpeed(u, v);
+	
+	data["windDir"] = iWindDirection == 0 ? 360 : iWindDirection;
+	data["windSpd"] = (int)round(windSpeed);
+	data["temp"] = (int)round(KelvinToCelcius(t));
+	
+	if(trueCourse)
+	{
+		double windCorrectionAngle = WindCorrectionAngle(windDirection, windSpeed, trueAirspeed, *trueCourse);
+		data["WCA"] = (int)round(windCorrectionAngle);
+		data["groundSpd"] = (int)round(GroundSpeed(windCorrectionAngle, windSpeed, trueAirspeed));
+	}
+	
+	return data;
+}
+
 Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double trueAirspeed, double lat, double lon, double* trueCourse = nullptr)
 {
 	auto values = ParseGrib(forecastIndex, lat, lon);
@@ -242,13 +241,8 @@ Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double tr
 	Json::Value obj;
 	Json::Value altitudes;
 
-	obj["lat"] = lat;
-	obj["long"] = lon;
-	
-	if(trueCourse)
-		obj["trueCourse"] = (int)round(*trueCourse);
-
 	obj["inHg"] = seaLevelPressure;
+
 	for(auto itr = keyMaster.begin(); itr != keyMaster.end(); itr++)
 	{
 		if(*itr == "mean sea level")
@@ -267,6 +261,15 @@ Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double tr
 	checkpointForecast[forecastIndex]["checkpts"][checkpointIndex] = obj;	
 	
 	return obj;
+}
+
+void AddCheckpointValue(int forecastIndex, int checkpointIndex, double trueAirspeed, const GeodesicLine& line)
+{
+	double lat, lon;
+	line.Position(checkpointIndex * segmentLength, lat, lon);
+			
+	double trueCourse = TrueCourse(lat, lon, line, checkpointIndex);
+	AddCheckpointValue(forecastIndex, checkpointIndex, trueAirspeed, lat, lon, &trueCourse);
 }
 
 int GetMagneticVariation(double lat, double lon)
@@ -300,15 +303,6 @@ int GetMagneticVariation(double lat, double lon)
 	}
 	
 	return -360;
-}
-
-void AddCheckpointValue(int forecastIndex, int checkpointIndex, double trueAirspeed, const GeodesicLine& line)
-{
-	double lat, lon;
-	line.Position(checkpointIndex * segmentLength, lat, lon);
-			
-	double trueCourse = TrueCourse(lat, lon, line, checkpointIndex);
-	AddCheckpointValue(forecastIndex, checkpointIndex, trueAirspeed, lat, lon, &trueCourse);
 }
 
 bool PrintJSON(string fileName)
@@ -372,16 +366,23 @@ int main(int argc, char* argv[])
 				AddCheckpointValue(forecastIndex, checkpointIndex, trueAirspeedAtCruise, line);
 		}
 
-		Json::Value magnetic(Json::arrayValue); 
+		Json::Value metadata(Json::arrayValue); 
 		for(auto index = 0; index <= num; index++)
 		{
+			Json::Value obj;
 			double lat, lon;
 			line.Position(index * segmentLength, lat, lon);
-			magnetic[index] = GetMagneticVariation(lat, lon);
+
+			obj["trueCourse"] = (int)round(TrueCourse(lat, lon, line, index));
+			obj["magVar"] = GetMagneticVariation(lat, lon);
+			obj["lat"] = lat;
+			obj["long"] = lon;
+			
+			metadata[index] = obj;
 		}
 		
 		result["pathData"] = pathData.str();
-		result["magneticVariation"] = magnetic;
+		result["checkpointMetadata"] = metadata;
 		
 		for(auto i = 0; i < FORECAST_HOURS; i++) 
 		{

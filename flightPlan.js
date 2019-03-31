@@ -26,13 +26,13 @@ class FlightPlan {
 			windCorrectionAngle: calc('WCA'),
 			groundSpeed: calc('groundSpd'),
 			temp: calc('temp'),
-			trueHeading: calc('trueHdg'),
 			windDirection: calc('windDir'),
 			windSpeed: calc('windSpd'),
 		};
 	}
 	
 	getModelValuesFor(forecastHour, checkpointIndex, altitude) {
+		var metadata = this.model.checkpointMetadata[checkpointIndex];
 		var checkpoint = this.model.forecasts[forecastHour].checkpts[checkpointIndex];	
 		var altitudeLow = null, altitudeHigh = null;
 		var keys = Object.keys(checkpoint.altitudes);
@@ -53,9 +53,13 @@ class FlightPlan {
 		if(altitudeHigh == null)
 			altitudeHigh = keys[keys.length - 1];
 		
+		
 		var result = this.interoplate(altitude, altitudeLow, checkpoint.altitudes[altitudeLow], altitudeHigh, checkpoint.altitudes[altitudeHigh]);
-		result.magneticHeading = result.trueHeading + this.model.magneticVariation[checkpointIndex];
-		result.trueCourse = checkpoint.trueCourse;
+		result.trueCourse = metadata.trueCourse;
+		result.trueHeading = (result.windCorrectionAngle + metadata.trueCourse) % 360;
+		result.magneticHeading = (result.trueHeading + metadata.magVar) % 360;
+		result.latitude = metadata.lat;
+		result.longitude = metadata['long'];
 		return result;
 	}
 }
