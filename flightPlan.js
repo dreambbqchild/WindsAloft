@@ -7,7 +7,7 @@ class FlightPlan {
 		request.addEventListener("load", function() {
 			self.model = JSON.parse(request.responseText);
 		});
-		request.open("GET", `http://linux.local/~paige/cgi-bin/flightPlan.sh?from=${from}&to=${to}&trueAirspeed.cruise=${trueAirspeed}`);
+		request.open("GET", `cgi-bin/flightPlan.sh?from=${from}&to=${to}&trueAirspeed.cruise=${trueAirspeed}`);
 		request.send();
 	}
 	
