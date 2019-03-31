@@ -134,13 +134,28 @@ double MillibarsToInHg(double pressure)
 	return pressure / 33.86389;
 }
 
-string MillibarLabelToInHgLabel(string label)
+double MetersToFeet(double m)
+{
+	return m = 3.281;
+}
+
+string MillibarLabelToAltitudeLabel(string label, double seaLevelPressure)
 {
 	stringstream stream;
 	auto value = atof(label.substr(0, label.length() - 3).c_str());
 	value = MillibarsToInHg(value);
 	
-	stream << fixed << setprecision(2) << value;
+	stream << (int)((seaLevelPressure - value) * 1000);
+	return stream.str();
+}
+
+string MetersLabelToAltitudeLabel(string label)
+{
+	stringstream stream;
+	auto value = atof(label.substr(0, label.length() - 23).c_str());
+	value = round(MetersToFeet(value));
+	
+	stream << (int)value;
 	return stream.str();
 }
 
@@ -223,7 +238,9 @@ unordered_map<string, double> ParseGrib(int forecastIndex, double lat, double lo
 Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double trueAirspeed, double lat, double lon, double* trueCourse = nullptr)
 {
 	auto values = ParseGrib(forecastIndex, lat, lon);
+	auto seaLevelPressure = PascalsToInHg(values["MSLET:mean sea level"]);
 	Json::Value obj;
+	Json::Value altitudes;
 
 	obj["lat"] = lat;
 	obj["long"] = lon;
@@ -231,21 +248,58 @@ Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double tr
 	if(trueCourse)
 		obj["trueCourse"] = (int)round(*trueCourse);
 
-	obj["inHg"] = PascalsToInHg(values["MSLET:mean sea level"]);
+	obj["inHg"] = seaLevelPressure;
 	for(auto itr = keyMaster.begin(); itr != keyMaster.end(); itr++)
 	{
 		if(*itr == "mean sea level")
 			continue;
 		
-		auto label = *itr;
-		if(label.find(" mb") == label.length() - 3)
-			label = MillibarLabelToInHgLabel(label);
-		
-		obj[label] = CheckpointData(values, *itr, trueAirspeed, trueCourse);
+		auto data = CheckpointData(values, *itr, trueAirspeed, trueCourse);
+		if((*itr).find(" mb") == (*itr).length() - 3)
+			altitudes[MillibarLabelToAltitudeLabel(*itr, seaLevelPressure)] = data;
+		else if((*itr).find(" m above mean sea level") == (*itr).length() - 23)
+			altitudes[MetersLabelToAltitudeLabel(*itr)] = data;
+		else
+			obj[*itr] = data; 
 	}		
+	
+	obj["altitudes"] = altitudes;
 	checkpointForecast[forecastIndex]["checkpts"][checkpointIndex] = obj;	
 	
 	return obj;
+}
+
+int GetMagneticVariation(double lat, double lon)
+{
+	int c = 0;
+	stringstream stream, buffer;
+	stream << "curl \"https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination?lat1=" << lat << "&lon1=" << lon << "&resultFormat=csv\" 2>/dev/null";
+	auto pipe = popen(stream.str().c_str(), "r");
+	
+	while ((c = fgetc(pipe)) != EOF)
+		buffer << (char)c;
+
+	pclose(pipe);	
+	
+	for (string line; getline(buffer, line); )
+	{
+		if(line.length() > 0 && line[0] == '#')
+			continue;
+		
+		stringstream csv;
+		csv << line;
+		string token;
+		auto index = 0;
+		while(getline(csv, token, ',')) 
+		{
+			if(index++ < 4)
+				continue;
+	
+			return (int)round(atof(token.c_str()) * -1);
+		}
+	}
+	
+	return -360;
 }
 
 void AddCheckpointValue(int forecastIndex, int checkpointIndex, double trueAirspeed, const GeodesicLine& line)
@@ -254,7 +308,7 @@ void AddCheckpointValue(int forecastIndex, int checkpointIndex, double trueAirsp
 	line.Position(checkpointIndex * segmentLength, lat, lon);
 			
 	double trueCourse = TrueCourse(lat, lon, line, checkpointIndex);
-	Json::Value obj = AddCheckpointValue(forecastIndex, checkpointIndex, trueAirspeed, lat, lon, &trueCourse);
+	AddCheckpointValue(forecastIndex, checkpointIndex, trueAirspeed, lat, lon, &trueCourse);
 }
 
 bool PrintJSON(string fileName)
@@ -318,13 +372,22 @@ int main(int argc, char* argv[])
 				AddCheckpointValue(forecastIndex, checkpointIndex, trueAirspeedAtCruise, line);
 		}
 
+		Json::Value magnetic(Json::arrayValue); 
+		for(auto index = 0; index <= num; index++)
+		{
+			double lat, lon;
+			line.Position(index * segmentLength, lat, lon);
+			magnetic[index] = GetMagneticVariation(lat, lon);
+		}
+		
 		result["pathData"] = pathData.str();
+		result["magneticVariation"] = magnetic;
 		
 		for(auto i = 0; i < FORECAST_HOURS; i++) 
 		{
 			AddCheckpointValue(i, num, trueAirspeedAtCruise, lat2, lon2);
-			auto time = checkpointForecast[i]["time"].asString();
-			result["forecasts"][time] = checkpointForecast[i];
+			result["forecasts"][i] = checkpointForecast[i];
+			result["forecasts"][i]["time"] = checkpointForecast[i]["time"].asString();
 		}
 		
 		Json::FastWriter writer;
