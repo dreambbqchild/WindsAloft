@@ -339,7 +339,6 @@ int main(int argc, char* argv[])
 	try {
 		LoadAirports();
 		Json::Value result;
-		stringstream pathData;
 
 		result["from"] = queryString["from"];
 		result["to"] = queryString["to"];
@@ -360,7 +359,6 @@ int main(int argc, char* argv[])
 		{	
 			double lat, lon;
 			line.Position(checkpointIndex * segmentLength, lat, lon);
-			pathData << lat << "," << lon << " ";
 			
 			for(auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
 				AddCheckpointValue(forecastIndex, checkpointIndex, trueAirspeedAtCruise, line);
@@ -381,7 +379,6 @@ int main(int argc, char* argv[])
 			metadata[index] = obj;
 		}
 		
-		result["pathData"] = pathData.str();
 		result["checkpointMetadata"] = metadata;
 		
 		for(auto i = 0; i < FORECAST_HOURS; i++) 
