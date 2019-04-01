@@ -139,24 +139,42 @@ double MetersToFeet(double m)
 	return m = 3.281;
 }
 
+double MillibarLabelToAltitude(string label, double seaLevelPressure)
+{
+        auto value = atof(label.substr(0, label.length() - 3).c_str());
+        value = MillibarsToInHg(value);
+
+        return (seaLevelPressure - value) * 1000;
+}
+
 string MillibarLabelToAltitudeLabel(string label, double seaLevelPressure)
 {
 	stringstream stream;
-	auto value = atof(label.substr(0, label.length() - 3).c_str());
-	value = MillibarsToInHg(value);
-
-	stream << (int)((seaLevelPressure - value) * 1000);
+	stream << (int)MillibarLabelToAltitude(label, seaLevelPressure);
 	return stream.str();
+}
+
+double MetersLabelToAltitude(string label)
+{
+        auto value = atof(label.substr(0, label.length() - 23).c_str());
+        return MetersToFeet(value);
 }
 
 string MetersLabelToAltitudeLabel(string label)
 {
 	stringstream stream;
-	auto value = atof(label.substr(0, label.length() - 23).c_str());
-	value = round(MetersToFeet(value));
-
-	stream << (int)value;
+	stream << (int)MetersLabelToAltitude(label);
 	return stream.str();
+}
+
+double LabelToAltitude(string label, double seaLevelPressure)
+{
+	if(label.find(" mb") == label.length() - 3)
+		return MillibarLabelToAltitude(label, PascalsToInHg(seaLevelPressure));
+        else if(label.find(" m above mean sea level") == label.length() - 23)
+		return MetersLabelToAltitude(label);
+
+	return 0;
 }
 
 double WindCorrectionAngle(double windDirection, double windSpeed, double trueAirspeed, double trueCourse)
@@ -231,8 +249,9 @@ Json::Value CheckpointData(unordered_map<string, double>& values, string key, do
 
 	if(trueCourse)
 	{
-		auto trueAirspeed = TrueAirspeed(indicatedAirspeed, seaLevelPressure, t);
-		auto  windCorrectionAngle = WindCorrectionAngle(windDirection, windSpeed, trueAirspeed, *trueCourse);
+		auto altitude = LabelToAltitude(key, seaLevelPressure);
+		auto trueAirspeed = TrueAirspeed(indicatedAirspeed, seaLevelPressure - ((altitude / 1000.0) * 3386.389), t);
+		auto windCorrectionAngle = WindCorrectionAngle(windDirection, windSpeed, trueAirspeed, *trueCourse);
 		data["WCA"] = (int)round(windCorrectionAngle);
 		data["groundSpd"] = (int)round(GroundSpeed(windCorrectionAngle, windSpeed, trueAirspeed));
 		data["trueAirspeed"] = (int)round(trueAirspeed);
@@ -257,11 +276,11 @@ Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double in
 
 		auto data = CheckpointData(values, *itr, seaLevelPressure, indicatedAirspeed, trueCourse);
 		if((*itr).find(" mb") == (*itr).length() - 3)
-			altitudes[MillibarLabelToAltitudeLabel(*itr, seaLevelPressure)] = data;
+			altitudes[MillibarLabelToAltitudeLabel(*itr, PascalsToInHg(seaLevelPressure))] = data;
 		else if((*itr).find(" m above mean sea level") == (*itr).length() - 23)
 			altitudes[MetersLabelToAltitudeLabel(*itr)] = data;
 		else
-			obj[*itr] = data; 
+			obj[*itr] = data;
 	}
 
 	obj["altitudes"] = altitudes;
