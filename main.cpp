@@ -26,7 +26,7 @@ const double segmentLength = 1852 * 10;//10 intervals after m to nm conversion.
 
 Geodesic geod(Constants::WGS84_a(), Constants::WGS84_f());
 
-Json::Value checkpointForecast[FORECAST_HOURS]; 
+Json::Value checkpointForecast[FORECAST_HOURS];
 
 unordered_set<string> keyMaster;
 
@@ -51,7 +51,7 @@ unordered_map<string, string> ParseQueryString()
 	queryString << getenv("QUERY_STRING");
 
 	string token;
-	while(getline(queryString, token, '&')) 
+	while(getline(queryString, token, '&'))
 	{
 		stringstream kvp;
 		kvp << token;
@@ -189,7 +189,7 @@ double TrueCourse(double lat1, double lon1, const GeodesicLine& line, int checkp
 
 double TrueAirspeed(double indicatedAirspeed, double pressure, double temperature)
 {
-	return indicatedAirspeed * sqrt(101325.0 / (pressure / (287.05 * temperature)));
+	return indicatedAirspeed * sqrt(1.2754 / (pressure / (287.058 * temperature)));
 }
 
 unordered_map<string, double> ParseGrib(int forecastIndex, double lat, double lon)
@@ -347,8 +347,10 @@ int main(int argc, char* argv[])
 		LoadAirports();
 		Json::Value result;
 
-		result["from"] = queryString["from"];
-		result["to"] = queryString["to"];
+		result["fromIdentifier"] = queryString["from"];
+		result["toIdentifier"] = queryString["to"];
+		result["fromName"] = airports[queryString["from"]]["name"];
+		result["toName"] = airports[queryString["to"]]["name"];
 
 		double
 			lat1 = airports[queryString["from"]]["latitude"].asDouble(), lon1 = airports[queryString["from"]]["longitude"].asDouble(),
