@@ -389,6 +389,7 @@ int main(int argc, char* argv[])
 		}
 
 		Json::StreamWriterBuilder builder;
+		builder["indentation"] = "";
 		unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
 
 		ofstream ofs (fileName.str(), ofstream::out);
