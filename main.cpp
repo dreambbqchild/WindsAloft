@@ -11,7 +11,7 @@
 #include <GeographicLib/Geodesic.hpp>
 #include <GeographicLib/GeodesicLine.hpp>
 #include <GeographicLib/Constants.hpp>
-#include <jsoncpp/json/json.h>
+#include <json/json.h>
 #include <curl/curl.h>
 
 using namespace std;
@@ -342,24 +342,24 @@ int main(int argc, char* argv[])
 
 		result["from"] = queryString["from"];
 		result["to"] = queryString["to"];
-				
+
 		double
 			lat1 = airports[queryString["from"]]["latitude"].asDouble(), lon1 = airports[queryString["from"]]["longitude"].asDouble(),
 			lat2 = airports[queryString["to"]]["latitude"].asDouble(), lon2 = airports[queryString["to"]]["longitude"].asDouble();
-		
+
 		const auto line = geod.InverseLine(lat1, lon1, lat2, lon2);
-		
+
 		for(auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
 			AddCheckpointValue(forecastIndex, 0, trueAirspeedAtCruise, line);
-	
+
 		result["nmDistance"] = (line.Distance() * 0.000539957);
-		
+
 		int num = int(ceil(line.Distance() / segmentLength));
 		for (int checkpointIndex = 1; checkpointIndex < num; checkpointIndex++) 
-		{	
+		{
 			double lat, lon;
 			line.Position(checkpointIndex * segmentLength, lat, lon);
-			
+
 			for(auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
 				AddCheckpointValue(forecastIndex, checkpointIndex, trueAirspeedAtCruise, line);
 		}
@@ -375,25 +375,26 @@ int main(int argc, char* argv[])
 			obj["magVar"] = GetMagneticVariation(lat, lon);
 			obj["lat"] = lat;
 			obj["long"] = lon;
-			
+
 			metadata[index] = obj;
 		}
-		
+
 		result["checkpointMetadata"] = metadata;
-		
+
 		for(auto i = 0; i < FORECAST_HOURS; i++) 
 		{
 			AddCheckpointValue(i, num, trueAirspeedAtCruise, lat2, lon2);
 			result["forecasts"][i] = checkpointForecast[i];
 			result["forecasts"][i]["time"] = checkpointForecast[i]["time"].asString();
 		}
-		
-		Json::FastWriter writer;
-		
+
+		Json::StreamWriterBuilder builder;
+		unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+
 		ofstream ofs (fileName.str(), ofstream::out);
-		ofs << writer.write(result);
+		writer->write(result, &ofs);
 		ofs.close();
-		
+
 		PrintJSON(fileName.str());
 	} catch (const exception& e) {
 		cerr << "Caught exception: " << e.what() << "\n";
