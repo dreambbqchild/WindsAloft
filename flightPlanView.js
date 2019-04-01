@@ -17,7 +17,7 @@ class FlightPlanView {
    `<td rowspan="2">${altitude}</td>
 	<td>${result.windDirection}</td>
 	<td>${result.windSpeed}</td>
-	<td rowspan="2">${flightPlan.trueAirspeed}</td>
+	<td rowspan="2">${result.trueAirspeed}</td>
 	<td rowspan="2">${result.groundSpeed}</td>
 	<td>${result.trueCourse}</td>
 	<td>${result.trueHeading}</td>
