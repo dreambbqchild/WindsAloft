@@ -56,14 +56,14 @@ class FlightPlan {
 				break;
 			}
 		}
-		
+
 		if(!altitudeLow)
 			throw `${altitude} too high`;
-		
+
 		if(altitudeHigh == null)
 			altitudeHigh = keys[keys.length - 1];
-		
-		
+
+
 		var result = this.interoplate(altitude, altitudeLow, checkpoint.altitudes[altitudeLow], altitudeHigh, checkpoint.altitudes[altitudeHigh]);
 		result.trueCourse = metadata.trueCourse;
 		result.trueHeading = (result.windCorrectionAngle + metadata.trueCourse) % 360;
@@ -71,8 +71,8 @@ class FlightPlan {
 		result.magneticHeading = (result.trueHeading + metadata.magVar) % 360;
 		result.latitude = metadata.lat;
 		result.longitude = metadata['long'];
-		result.distanceTraveled = Math.round(this.model.nmDistance - (checkpointIndex * 10));
-		result.distanceToGo = Math.round(this.model.nmDistance - result.distanceTraveled);
+		result.distanceToGo = Math.round(this.model.nmDistance - (checkpointIndex * 10));
+		result.distanceTraveled = Math.round(this.model.nmDistance - result.distanceToGo);
 		return result;
 	}
 }
