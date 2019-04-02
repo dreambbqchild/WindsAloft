@@ -25,9 +25,7 @@
 				var view = new FlightPlanView(flightPlan);
 				var tbody = document.querySelector('.results');
 				tbody.innerHTML = '';
-				for(var i = 0; i < flightPlan.numberOfCheckpoints() - 1; i++) {
-						view.getTableRows(parseInt(form.initalForecast.value), i, parseInt(form.altitude.value)).forEach(row => tbody.appendChild(row));
-				}
+				view.getTableRows(parseInt(form.initalForecast.value), parseInt(form.altitude.value)).forEach(row => tbody.appendChild(row));
 			}
 		</script>
 	</body>
@@ -55,14 +53,14 @@
 		<td>TC</td>
 		<td>TH</td>
 		<td>MH</td>
-		<td>Dist. Traveled</td>
+		<td>Dist.<br/>Traveled</td>
 	</tr>
 	<tr>
 		<td colspan="2">Temp</td>
 		<td>Wind +/-</td>
 		<td>Var +/-</td>
 		<td></td>
-		<td>Dist. To Go</td>
+		<td>Dist.<br/>To Go</td>
 	</tr>
 	</thead>
 	<tbody class="results">

@@ -14,29 +14,45 @@ class FlightPlanView {
 		});
 	}
 	
-	getTableRows(forecastHour, checkpointIndex, altitude) {
+	getTableRows(forecastHour, altitude) {
 		function toDomObject(str) {
 			var tr = document.createElement('tr');
 			tr.innerHTML = str;
 			return tr;
 		}
+	
+		function rows(subResult) {	
+			return [
+				toDomObject(`<td rowspan="2">${altitude}</td>
+				<td>${subResult.windDirection}</td>
+				<td>${subResult.windSpeed}</td>
+				<td rowspan="2">${subResult.trueAirspeed}</td>
+				<td rowspan="2">${subResult.groundSpeed}</td>
+				<td>${subResult.trueCourse}</td>
+				<td>${subResult.trueHeading}</td>
+				<td>${subResult.magneticHeading}</td>
+				<td>${subResult.distanceTraveled}</td>`),
+				toDomObject(`<td colspan="2">${subResult.temp}</td>
+				<td>${subResult.windCorrectionAngle}</td>
+				<td>${subResult.magneticVariation}</td>
+				<td></td>
+				<td>${subResult.distanceToGo}</td>`)
+			];
+		}
+	
+		var result = [];
+		var hourComplete = 0;
+		for(var i = 0; i < flightPlan.numberOfCheckpoints() - 1; i++) {
+			if(hourComplete >= 1) {
+				hourComplete = 0;
+				forecastHour++;
+			}
+			
+			var subResult = flightPlan.getModelValuesFor(forecastHour, i, altitude);
+			hourComplete += 10 / subResult.groundSpeed;
+			result = result.concat(rows(subResult));
+		}
 		
-		var result = flightPlan.getModelValuesFor(forecastHour, checkpointIndex, altitude);
-		return [toDomObject(
-   `<td rowspan="2">${altitude}</td>
-	<td>${result.windDirection}</td>
-	<td>${result.windSpeed}</td>
-	<td rowspan="2">${result.trueAirspeed}</td>
-	<td rowspan="2">${result.groundSpeed}</td>
-	<td>${result.trueCourse}</td>
-	<td>${result.trueHeading}</td>
-	<td>${result.magneticHeading}</td>
-	<td>${result.distanceTraveled}</td>`),
-	toDomObject(
-   `<td colspan="2">${result.temp}</td>
-	<td>${result.windCorrectionAngle}</td>
-	<td>${result.magneticVariation}</td>
-	<td></td>
-	<td>${result.distanceToGo}</td>`)];
+		return result;
 	}
 }
