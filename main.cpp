@@ -21,7 +21,8 @@ namespace fs = std::experimental::filesystem;
 
 Json::Value airports;
 Json::Value checkpointForecast(Json::arrayValue);
-Json::Value metadataValues(Json::arrayValue);
+Json::Value checkpointMetadata(Json::arrayValue);
+Json::Value forecastMetadata(Json::arrayValue);
 
 const double segmentLength = 1852 * 10;//10 intervals after m to nm conversion.
 
@@ -158,7 +159,6 @@ Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double in
 	Json::Value altitudes;
 
 	obj["inHg"] = PascalsToInHg(seaLevelPressure);
-	obj["time"] = gribParser.GetEvalTime();
 
 	for (auto itr = keyMaster.begin(); itr != keyMaster.end(); itr++)
 	{
@@ -185,7 +185,14 @@ Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double in
 		metadata["lat"] = lat;
 		metadata["long"] = lon;
 
-		metadataValues[checkpointIndex] = metadata;
+		checkpointMetadata[checkpointIndex] = metadata;
+	}
+
+	if(checkpointIndex == 0)
+	{
+		Json::Value metadata;
+		metadata["time"] = gribParser.GetEvalTime();
+		forecastMetadata[forecastIndex] = metadata;
 	}
 
 	return obj;
@@ -263,7 +270,8 @@ int main(int argc, char* argv[])
 			AddCheckpointValue(forecastIndex, num, indicatedAirspeed, line, lat2, lon2);
 
 		result["forecasts"] = checkpointForecast;
-		result["checkpointMetadata"] = metadataValues;
+		result["checkpointMetadata"] = checkpointMetadata;
+		result["forecastMetadata"] = forecastMetadata;
 
 		Json::StreamWriterBuilder builder;
 		builder["indentation"] = "";

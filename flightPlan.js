@@ -13,7 +13,13 @@ class FlightPlan {
 		this.httpRequest = new Promise(function(resolve) {
 			var request = new XMLHttpRequest();
 			request.addEventListener("load", function() {
-				self.model = JSON.parse(request.responseText);
+				self.model = JSON.parse(request.responseText, (key, value) => {
+					if(key === 'time') {
+						var m = value.match(/(\d\d\d\d)(\d\d)(\d\d)(\d\d)/);
+						return new Date(Date.UTC(m[1], m[2], m[3], m[4]));
+					}
+					return value;
+				});
 				resolve(self);
 			});
 			request.open("GET", `cgi-bin/flightPlan.sh?from=${from}&to=${to}&indicatedAirspeed=${indicatedAirspeed}`);
