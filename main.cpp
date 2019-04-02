@@ -133,8 +133,7 @@ Json::Value CheckpointData(unordered_map<string, double>& values, string key, do
 	auto iWindDirection = (int)round(windDirection);
 	auto windSpeed = WindSpeed(u, v);
 
-	auto altitude = LabelToAltitude(key, seaLevelPressure);
-	auto trueAirspeed = TrueAirspeed(indicatedAirspeed, seaLevelPressure - InHgToPascals(altitude / 1000.0), t);
+	auto trueAirspeed = TrueAirspeed(indicatedAirspeed, seaLevelPressure, t);
 	auto windCorrectionAngle = WindCorrectionAngle(windDirection, windSpeed, trueAirspeed, trueCourse);
 
 	data["windDir"] = iWindDirection == 0 ? 360 : iWindDirection;
