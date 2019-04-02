@@ -91,10 +91,12 @@ double WindCorrectionAngle(double windDirection, double windSpeed, double trueAi
 	return asin((windSpeed * sin(awaRadians)) / trueAirspeed) / Math::degree();
 }
 
-double GroundSpeed(double windCorrectionAngle, double windSpeed, double trueAirspeed)
+double GroundSpeed(double windDirection, double windSpeed, double trueHeading, double trueAirspeed)
 {
-	windCorrectionAngle = windCorrectionAngle * Math::degree();
-	return cos(windCorrectionAngle) * trueAirspeed + windSpeed;
+	windDirection = windDirection * Math::degree();
+	trueHeading = trueHeading * Math::degree();
+
+	return (trueAirspeed * sqrt(1 - pow(windSpeed / trueAirspeed, 2))) - (windSpeed * cos(windDirection - trueHeading));
 }
 
 double TrueCourse(double lat1, double lon1, const GeodesicLine& line, int checkpointIndex)
@@ -140,7 +142,7 @@ Json::Value CheckpointData(unordered_map<string, double>& values, string key, do
 	data["windSpd"] = (int)round(windSpeed);
 	data["temp"] = (int)round(KelvinToCelcius(t));
 	data["WCA"] = (int)round(windCorrectionAngle);
-	data["groundSpd"] = (int)round(GroundSpeed(windCorrectionAngle, windSpeed, trueAirspeed));
+	data["groundSpd"] = (int)round(GroundSpeed(windDirection, windSpeed, trueCourse + windCorrectionAngle, trueAirspeed));
 	data["trueAirspeed"] = (int)round(trueAirspeed);
 
 	return data;

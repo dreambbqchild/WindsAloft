@@ -1,7 +1,7 @@
 #!/bin/bash
 
-export ZHOUR=12
-export TIMESTAMP=2019033112
+export ZHOUR=06
+export TIMESTAMP=2019040206
 export FORECASTS=(anl f001 f002 f003 f004 f005 f006 f007 f008 f009 f010 f011 f012 f013 f014)
 export FILENAMES=(analysis hour1 hour2 hour3 hour4 hour5 hour6 hour7 hour8 hour9 hour10 hour11 hour12 hour13 hour14)
 
