@@ -1,7 +1,14 @@
 # Winds Aloft
 
-This can combine weather model data that can be extracted with wgrib2, with a database of airport latitude and logitude values to create the wind correction for flight plans between two airports. Not for use as the primary means of calculating this, but it's a good way to double check or grok how ForeFlight et. al. might work under the hood.
+Dependencies:
+* https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/compile_questions.html
+* https://geographiclib.sourceforge.io (You'll also need to install the magnetic model wmm2015)
+* https://github.com/open-source-parsers/jsoncpp
 
-When I did my Commercial ASEL checkride, this was one minute over what Foreflight had, my calc by the ole' fashion' way was one minute under so there's a shot this actually works.
+Aims to build a flight plan in 10nm intervals using data extracted from the GFS weather model (See getData.sh for a pointer script on how to get that).
 
-On the not for use subject, it would be a bad idea to face this as is on a webserver on the Interent cause it has oppertunities to pown said server for an attacker.
+The C++ is designed to be complied into a CGI program, then the JavaScript n' HTML can be used on an appropriately configured webserver to build a flight plan. What that appropriate configuration is, will be contingent upon your setup so I ain't goin' to venture to guess.
+
+It would be a bad idea to face this as is on a webserver on the Interent cause it offers oppertunity to p0wn said server for an attacker. Virtual Machine recommended.
+
+Lastly, this is a research/educational project. If used for actual flight planning, the user would be demonstrating questionable risk management skills, and ADM. So, don't do that eh.
