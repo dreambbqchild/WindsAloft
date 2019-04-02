@@ -16,7 +16,7 @@ class FlightPlan {
 				self.model = JSON.parse(request.responseText, (key, value) => {
 					if(key === 'time') {
 						var m = value.match(/(\d\d\d\d)(\d\d)(\d\d)(\d\d)/);
-						return new Date(Date.UTC(m[1], m[2], m[3], m[4]));
+						return new Date(Date.UTC(m[1], parseInt(m[2]) - 1, m[3], m[4]));
 					}
 					return value;
 				});

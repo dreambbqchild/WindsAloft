@@ -13,6 +13,10 @@
 			var flightPlan = new FlightPlan('KFCM', 'KMCD', 110);
 			
 			flightPlan.httpRequest.then(function() {
+				var form = document.forms.flightPlanConfig;
+				var view = new FlightPlanView(flightPlan);
+				form.initalForecast.innerHTML = '';
+				view.getForecastOptions().forEach(option => form.initalForecast.appendChild(option));
 				document.querySelectorAll('[data-needs]').forEach(n => n.disabled = false);
 			});
 
@@ -20,11 +24,10 @@
 				var form = document.forms.flightPlanConfig;
 				var view = new FlightPlanView(flightPlan);
 				var tbody = document.querySelector('.results');
-                                tbody.innerHTML = '';
-                                for(var i = 0; i < flightPlan.numberOfCheckpoints() - 1; i++) {
-                                        view.getTableRows(parseInt(form.initalForecast.value), i, parseInt(form.altitude.value)).forEach(row => tbody.appendChild(row));
-                                }
-
+				tbody.innerHTML = '';
+				for(var i = 0; i < flightPlan.numberOfCheckpoints() - 1; i++) {
+						view.getTableRows(parseInt(form.initalForecast.value), i, parseInt(form.altitude.value)).forEach(row => tbody.appendChild(row));
+				}
 			}
 		</script>
 	</body>
@@ -36,7 +39,7 @@
 				<td colspan="2"><input data-needs type="button" value="Submit" onclick="getFlightPlan()" disabled/></td>
 			</tr>
 			<tr>
-				<td><input type="text" name="initalForecast"/></td>
+				<td><select name="initalForecast"/></td>
 				<td><input type="text" name="altitude"/></td>
 			</tr>
 		</table>

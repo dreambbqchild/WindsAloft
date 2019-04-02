@@ -5,6 +5,15 @@ class FlightPlanView {
 		this.flightPlan = flightPlan;
 	}
 	
+	getForecastOptions() {		
+		return this.flightPlan.model.forecastMetadata.map((metadata, i)=> {
+			var option = document.createElement('option');
+			option.value = i;
+			option.text = (metadata.time.getMonth() + 1) + "/" + metadata.time.getDay() + " " + metadata.time.getHours() + ":00";
+			return option;
+		});
+	}
+	
 	getTableRows(forecastHour, checkpointIndex, altitude) {
 		function toDomObject(str) {
 			var tr = document.createElement('tr');
