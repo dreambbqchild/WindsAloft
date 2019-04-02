@@ -8,7 +8,7 @@ double MillibarLabelToAltitude(string label, double seaLevelPressure)
 	auto value = atof(label.substr(0, label.length() - 3).c_str());
 	value = MillibarsToInHg(value);
 
-	return (MillibarsToInHg(seaLevelPressure) - value) * 1000;
+	return (PascalsToInHg(seaLevelPressure) - value) * 1000;
 }
 
 string MillibarLabelToAltitudeLabel(string label, double seaLevelPressure)
