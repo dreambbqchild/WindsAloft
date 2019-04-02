@@ -120,7 +120,7 @@ int GetMagneticVariation(double lat, double lon)
 
 	double H, F, D, I;
 	MagneticModel::FieldComponents(Bx, By, Bz, H, F, D, I);
-	return (int)round(D);
+	return (int)(round(D) * -1);
 }
 
 Json::Value CheckpointData(unordered_map<string, double>& values, string key, double seaLevelPressure, double indicatedAirspeed, double trueCourse)
