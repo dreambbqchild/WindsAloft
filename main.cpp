@@ -254,7 +254,7 @@ int main(int argc, char* argv[])
 		result["nmDistance"] = (line.Distance() * 0.000539957);
 		int num = int(ceil(line.Distance() / segmentLength));
 
-		for (auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
+		for (auto forecastIndex = 0; forecastIndex <= FORECAST_HOURS; forecastIndex++)
 		{
 			Json::Value checkpoints(Json::arrayValue);
 			checkpointForecast[forecastIndex]["checkpts"] = checkpoints;
@@ -262,11 +262,11 @@ int main(int argc, char* argv[])
 
 		for (int checkpointIndex = 0; checkpointIndex < num; checkpointIndex++)
 		{
-			for (auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
+			for (auto forecastIndex = 0; forecastIndex <= FORECAST_HOURS; forecastIndex++)
 				AddCheckpointValue(forecastIndex, checkpointIndex, indicatedAirspeed, line);
 		}
 
-		for (auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
+		for (auto forecastIndex = 0; forecastIndex <= FORECAST_HOURS; forecastIndex++)
 			AddCheckpointValue(forecastIndex, num, indicatedAirspeed, line, lat2, lon2);
 
 		result["forecasts"] = checkpointForecast;
