@@ -4,31 +4,30 @@
 #include <cmath>
 #include <sstream>
 #include <fstream>
-#include <unordered_map>
-#include <unordered_set>
 #include <experimental/filesystem>
 #include <stdlib.h>
 #include <GeographicLib/Geodesic.hpp>
 #include <GeographicLib/GeodesicLine.hpp>
 #include <GeographicLib/Constants.hpp>
-#include <json/json.h>
+#include <GeographicLib/MagneticModel.hpp>
 #include <curl/curl.h>
+
+#include "GribParser.h"
+#include "Conversions.h"
 
 using namespace std;
 using namespace GeographicLib;
 namespace fs = std::experimental::filesystem;
 
 Json::Value airports;
-
-#define FORECAST_HOURS 14
+Json::Value checkpointForecast(Json::arrayValue);
+Json::Value metadataValues(Json::arrayValue);
 
 const double segmentLength = 1852 * 10;//10 intervals after m to nm conversion.
 
 Geodesic geod(Constants::WGS84_a(), Constants::WGS84_f());
 
-Json::Value checkpointForecast[FORECAST_HOURS];
-
-unordered_set<string> keyMaster;
+GribParser gribParser;
 
 string GetDecodedValue(CURL *curl, string value)
 {
@@ -51,7 +50,7 @@ unordered_map<string, string> ParseQueryString()
 	queryString << getenv("QUERY_STRING");
 
 	string token;
-	while(getline(queryString, token, '&'))
+	while (getline(queryString, token, '&'))
 	{
 		stringstream kvp;
 		kvp << token;
@@ -59,9 +58,9 @@ unordered_map<string, string> ParseQueryString()
 		string key;
 		string innerToken;
 
-		while(getline(kvp, innerToken, '=')) 
+		while (getline(kvp, innerToken, '='))
 		{
-			if(key.length())
+			if (key.length())
 				result[key] = GetDecodedValue(curl, innerToken);
 			else
 				key = innerToken;
@@ -76,105 +75,8 @@ unordered_map<string, string> ParseQueryString()
 void LoadAirports()
 {
 	ifstream ifs;
-	ifs.open (getenv("AIRPORT_DB_PATH"), ifstream::in);
+	ifs.open(getenv("AIRPORT_DB_PATH"), ifstream::in);
 	ifs >> airports;
-}
-
-void ForecastDataFromLine(int forecastIndex, string line, unordered_map<string, double>& values) 
-{
-	stringstream buffer;
-	buffer << line;
-	string token;
-	string keyPrefix;
-	string keySuffix;
-	double value = 0;
-
-	while(std::getline(buffer, token, ':')) 
-	{
-		if(!checkpointForecast[forecastIndex] && token.find("start_ft") == 0) {
-			Json::Value checkpoints(Json::arrayValue); 
-			checkpointForecast[forecastIndex]["time"] = token.substr(9);
-			checkpointForecast[forecastIndex]["checkpts"] = checkpoints;
-		}
-		else if(token == "UGRD" || token == "VGRD" || token == "TMP" || token == "MSLET")
-			keyPrefix = token;
-		else if(keyPrefix.length() && !keySuffix.length())
-			keyMaster.emplace(keySuffix = token);
-		else if(auto equals = token.find_last_of("="))
-			value = atof(token.substr(equals + 1).c_str());
-	}
-
-	string key = keyPrefix + ":" + keySuffix;
-	values[key] = value;
-}
-
-double WindDirection(double u, double v)
-{
-	return (180/3.14) * atan2(u, v) + 180;
-}
-
-double WindSpeed(double u, double v)
-{
-	                              //m/s to KTS
-	return sqrt(u * u + v * v) * 1.94384;
-}
-
-double KelvinToCelcius(double tmp)
-{
-	return tmp - 273.15;
-}
-
-double PascalsToInHg(double pressure)
-{
-	return pressure / 3386.389;
-}
-
-double MillibarsToInHg(double pressure)
-{
-	return pressure / 33.86389;
-}
-
-double MetersToFeet(double m)
-{
-	return m = 3.281;
-}
-
-double MillibarLabelToAltitude(string label, double seaLevelPressure)
-{
-        auto value = atof(label.substr(0, label.length() - 3).c_str());
-        value = MillibarsToInHg(value);
-
-        return (seaLevelPressure - value) * 1000;
-}
-
-string MillibarLabelToAltitudeLabel(string label, double seaLevelPressure)
-{
-	stringstream stream;
-	stream << (int)MillibarLabelToAltitude(label, seaLevelPressure);
-	return stream.str();
-}
-
-double MetersLabelToAltitude(string label)
-{
-        auto value = atof(label.substr(0, label.length() - 23).c_str());
-        return MetersToFeet(value);
-}
-
-string MetersLabelToAltitudeLabel(string label)
-{
-	stringstream stream;
-	stream << (int)MetersLabelToAltitude(label);
-	return stream.str();
-}
-
-double LabelToAltitude(string label, double seaLevelPressure)
-{
-	if(label.find(" mb") == label.length() - 3)
-		return MillibarLabelToAltitude(label, PascalsToInHg(seaLevelPressure));
-        else if(label.find(" m above mean sea level") == label.length() - 23)
-		return MetersLabelToAltitude(label);
-
-	return 0;
 }
 
 double WindCorrectionAngle(double windDirection, double windSpeed, double trueAirspeed, double trueCourse)
@@ -210,74 +112,62 @@ double TrueAirspeed(double indicatedAirspeed, double pressure, double temperatur
 	return indicatedAirspeed * sqrt(1.2754 / (pressure / (287.058 * temperature)));
 }
 
-unordered_map<string, double> ParseGrib(int forecastIndex, double lat, double lon)
+int GetMagneticVariation(double lat, double lon)
 {
-	int c = 0;
-	stringstream stream, buffer, hour;
-	unordered_map<string, double> forecastData;
+	MagneticModel mag("wmm2015");
+	double Bx, By, Bz;
+	mag(2019, lat, lon, 0, Bx, By, Bz);
 
-	hour << "hour" << forecastIndex;
-
-	stream << getenv("WGRIB2_LOCATION") << " " << getenv("WGRIB2_DATA_LOCATION") << "/" << (forecastIndex == 0 ? "analysis" : hour.str()) << ".grb -start_ft -s -lon " << lon << " " << lat;
-
-	auto pipe = popen(stream.str().c_str(), "r");
-
-	while ((c = fgetc(pipe)) != EOF)
-		buffer << (char)c;
-
-	pclose(pipe);
-
-	for (string line; getline(buffer, line); )
-        ForecastDataFromLine(forecastIndex, line, forecastData);
-
-	return forecastData;
+	double H, F, D, I;
+	MagneticModel::FieldComponents(Bx, By, Bz, H, F, D, I);
+	return (int)round(D);
 }
 
-Json::Value CheckpointData(unordered_map<string, double>& values, string key, double seaLevelPressure, double indicatedAirspeed, double* trueCourse)
+Json::Value CheckpointData(unordered_map<string, double>& values, string key, double seaLevelPressure, double indicatedAirspeed, double trueCourse)
 {
 	Json::Value data;
-	auto u = values["UGRD:" + key];
-	auto v = values["VGRD:" + key];
-	auto t = values["TMP:" + key];
+	auto u = values[GRIB_KEY(U_COMPONENT_OF_WIND, key)];
+	auto v = values[GRIB_KEY(V_COMPONENT_OF_WIND, key)];
+	auto t = values[GRIB_KEY(TEMPERATURE, key)];
 	auto windDirection = WindDirection(u, v);
 	auto iWindDirection = (int)round(windDirection);
 	auto windSpeed = WindSpeed(u, v);
 
+	auto altitude = LabelToAltitude(key, seaLevelPressure);
+	auto trueAirspeed = TrueAirspeed(indicatedAirspeed, seaLevelPressure - InHgToPascals(altitude / 1000.0), t);
+	auto windCorrectionAngle = WindCorrectionAngle(windDirection, windSpeed, trueAirspeed, trueCourse);
+
 	data["windDir"] = iWindDirection == 0 ? 360 : iWindDirection;
 	data["windSpd"] = (int)round(windSpeed);
 	data["temp"] = (int)round(KelvinToCelcius(t));
-
-	if(trueCourse)
-	{
-		auto altitude = LabelToAltitude(key, seaLevelPressure);
-		auto trueAirspeed = TrueAirspeed(indicatedAirspeed, seaLevelPressure - ((altitude / 1000.0) * 3386.389), t);
-		auto windCorrectionAngle = WindCorrectionAngle(windDirection, windSpeed, trueAirspeed, *trueCourse);
-		data["WCA"] = (int)round(windCorrectionAngle);
-		data["groundSpd"] = (int)round(GroundSpeed(windCorrectionAngle, windSpeed, trueAirspeed));
-		data["trueAirspeed"] = (int)round(trueAirspeed);
-	}
+	data["WCA"] = (int)round(windCorrectionAngle);
+	data["groundSpd"] = (int)round(GroundSpeed(windCorrectionAngle, windSpeed, trueAirspeed));
+	data["trueAirspeed"] = (int)round(trueAirspeed);
 
 	return data;
 }
 
-Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double indicatedAirspeed, double lat, double lon, double* trueCourse = nullptr)
+Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double indicatedAirspeed, const GeodesicLine& line, double lat, double lon)
 {
-	auto values = ParseGrib(forecastIndex, lat, lon);
-	auto seaLevelPressure = values["MSLET:mean sea level"];
+	auto trueCourse = TrueCourse(lat, lon, line, checkpointIndex);
+	auto values = gribParser.Eval(forecastIndex, lat, lon);
+	auto seaLevelPressure = values[GRIB_KEY(MSL_PRESSURE, "mean sea level")];
+	auto keyMaster = gribParser.GetKeys();
 	Json::Value obj;
 	Json::Value altitudes;
 
 	obj["inHg"] = PascalsToInHg(seaLevelPressure);
+	obj["time"] = gribParser.GetEvalTime();
 
-	for(auto itr = keyMaster.begin(); itr != keyMaster.end(); itr++)
+	for (auto itr = keyMaster.begin(); itr != keyMaster.end(); itr++)
 	{
-		if(*itr == "mean sea level")
+		if (*itr == "mean sea level")
 			continue;
 
 		auto data = CheckpointData(values, *itr, seaLevelPressure, indicatedAirspeed, trueCourse);
-		if((*itr).find(" mb") == (*itr).length() - 3)
-			altitudes[MillibarLabelToAltitudeLabel(*itr, PascalsToInHg(seaLevelPressure))] = data;
-		else if((*itr).find(" m above mean sea level") == (*itr).length() - 23)
+		if ((*itr).find(" mb") == (*itr).length() - 3)
+			altitudes[MillibarLabelToAltitudeLabel(*itr, seaLevelPressure)] = data;
+		else if ((*itr).find(" m above mean sea level") == (*itr).length() - 23)
 			altitudes[MetersLabelToAltitudeLabel(*itr)] = data;
 		else
 			obj[*itr] = data;
@@ -286,59 +176,36 @@ Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double in
 	obj["altitudes"] = altitudes;
 	checkpointForecast[forecastIndex]["checkpts"][checkpointIndex] = obj;
 
+	if (forecastIndex == 0)
+	{
+		Json::Value metadata;
+		metadata["trueCourse"] = (int)round(trueCourse);
+		metadata["magVar"] = GetMagneticVariation(lat, lon);
+		metadata["lat"] = lat;
+		metadata["long"] = lon;
+
+		metadataValues[checkpointIndex] = metadata;
+	}
+
 	return obj;
 }
 
-void AddCheckpointValue(int forecastIndex, int checkpointIndex, double indicatedAirspeed, const GeodesicLine& line)
+Json::Value AddCheckpointValue(int forecastIndex, int checkpointIndex, double indicatedAirspeed, const GeodesicLine& line)
 {
 	double lat, lon;
 	line.Position(checkpointIndex * segmentLength, lat, lon);
 
-	double trueCourse = TrueCourse(lat, lon, line, checkpointIndex);
-	AddCheckpointValue(forecastIndex, checkpointIndex, indicatedAirspeed, lat, lon, &trueCourse);
-}
-
-int GetMagneticVariation(double lat, double lon)
-{
-	int c = 0;
-	stringstream stream, buffer;
-	stream << "curl \"https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination?lat1=" << lat << "&lon1=" << lon << "&resultFormat=csv\" 2>/dev/null";
-	auto pipe = popen(stream.str().c_str(), "r");
-
-	while ((c = fgetc(pipe)) != EOF)
-		buffer << (char)c;
-
-	pclose(pipe);
-
-	for (string line; getline(buffer, line); )
-	{
-		if(line.length() > 0 && line[0] == '#')
-			continue;
-
-		stringstream csv;
-		csv << line;
-		string token;
-		auto index = 0;
-		while(getline(csv, token, ',')) 
-		{
-			if(index++ < 4)
-				continue;
-
-			return (int)round(atof(token.c_str()) * -1);
-		}
-	}
-
-	return -360;
+	return AddCheckpointValue(forecastIndex, checkpointIndex, indicatedAirspeed, line, lat, lon);
 }
 
 bool PrintJSON(string fileName)
 {
-	if(fs::exists(fileName))
+	if (fs::exists(fileName))
 	{
 		string line;
-		ifstream ifs (fileName, ifstream::in);
+		ifstream ifs(fileName, ifstream::in);
 
-		while(getline(ifs, line)) 
+		while (getline(ifs, line))
 			cout << line;
 
 		ifs.close();
@@ -348,18 +215,18 @@ bool PrintJSON(string fileName)
 	return false;
 }
 
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
 	auto queryString = ParseQueryString();
 
-	if(!queryString["indicatedAirspeed"].length() || !queryString["to"].length() || !queryString["from"].length())
+	if (!queryString["indicatedAirspeed"].length() || !queryString["to"].length() || !queryString["from"].length())
 		return 0;
 
 	double indicatedAirspeed = atof(queryString["indicatedAirspeed"].c_str());
 	stringstream fileName;
 	fileName << getenv("FLIGHT_PLAN_CACHE") << "/" << queryString["from"] << "to" << queryString["to"] << "at" << queryString["indicatedAirspeed"] << ".json";
 
-	if(PrintJSON(fileName.str()))
+	if (PrintJSON(fileName.str()))
 		return 0;
 
 	try {
@@ -376,56 +243,38 @@ int main(int argc, char* argv[])
 			lat2 = airports[queryString["to"]]["latitude"].asDouble(), lon2 = airports[queryString["to"]]["longitude"].asDouble();
 
 		const auto line = geod.InverseLine(lat1, lon1, lat2, lon2);
-
-		for(auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
-			AddCheckpointValue(forecastIndex, 0, indicatedAirspeed, line);
-
 		result["nmDistance"] = (line.Distance() * 0.000539957);
-
 		int num = int(ceil(line.Distance() / segmentLength));
-		for (int checkpointIndex = 1; checkpointIndex < num; checkpointIndex++) 
-		{
-			double lat, lon;
-			line.Position(checkpointIndex * segmentLength, lat, lon);
 
-			for(auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
+		for (auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
+		{
+			Json::Value checkpoints(Json::arrayValue);
+			checkpointForecast[forecastIndex]["checkpts"] = checkpoints;
+		}
+
+		for (int checkpointIndex = 0; checkpointIndex < num; checkpointIndex++)
+		{
+			for (auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
 				AddCheckpointValue(forecastIndex, checkpointIndex, indicatedAirspeed, line);
 		}
 
-		Json::Value metadata(Json::arrayValue); 
-		for(auto index = 0; index <= num; index++)
-		{
-			Json::Value obj;
-			double lat, lon;
-			line.Position(index * segmentLength, lat, lon);
+		for (auto forecastIndex = 0; forecastIndex < FORECAST_HOURS; forecastIndex++)
+			AddCheckpointValue(forecastIndex, num, indicatedAirspeed, line, lat2, lon2);
 
-			obj["trueCourse"] = (int)round(TrueCourse(lat, lon, line, index));
-			obj["magVar"] = GetMagneticVariation(lat, lon);
-			obj["lat"] = lat;
-			obj["long"] = lon;
-
-			metadata[index] = obj;
-		}
-
-		result["checkpointMetadata"] = metadata;
-
-		for(auto i = 0; i < FORECAST_HOURS; i++) 
-		{
-			AddCheckpointValue(i, num, indicatedAirspeed, lat2, lon2);
-			result["forecasts"][i] = checkpointForecast[i];
-			result["forecasts"][i]["time"] = checkpointForecast[i]["time"].asString();
-		}
+		result["forecasts"] = checkpointForecast;
+		result["checkpointMetadata"] = metadataValues;
 
 		Json::StreamWriterBuilder builder;
 		builder["indentation"] = "";
 		unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
 
-		ofstream ofs (fileName.str(), ofstream::out);
+		ofstream ofs(fileName.str(), ofstream::out);
 		writer->write(result, &ofs);
 		ofs.close();
 
 		PrintJSON(fileName.str());
-	} catch (const exception& e) {
+	}
+	catch (const exception& e) {
 		cerr << "Caught exception: " << e.what() << "\n";
 		return 1;
 	}
