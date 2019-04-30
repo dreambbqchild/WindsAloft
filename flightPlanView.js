@@ -9,7 +9,7 @@ class FlightPlanView {
 		return this.flightPlan.model.forecastMetadata.map((metadata, i)=> {
 			var option = document.createElement('option');
 			option.value = i;
-			option.text = (metadata.time.getMonth() + 1) + "/" + metadata.time.getDay() + " " + metadata.time.getHours() + ":00";
+			option.text = (metadata.time.getMonth() + 1) + "/" + metadata.time.getDate() + " " + metadata.time.getHours() + ":00";
 			return option;
 		});
 	}
