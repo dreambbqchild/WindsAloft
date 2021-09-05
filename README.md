@@ -2,10 +2,8 @@
 
 Dependencies:
 * https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/compile_questions.html
-* https://geographiclib.sourceforge.io (You'll also need to install the magnetic model wmm2015)
+* https://geographiclib.sourceforge.io (You'll also need to install the magnetic model wmm2020)
 * https://github.com/open-source-parsers/jsoncpp
-* libcurl
-* std::filesystem
 
 Aims to build a flight plan in 10nm intervals using data extracted from the GFS weather model (See getData.sh for a pointer script on how to get that).
 
