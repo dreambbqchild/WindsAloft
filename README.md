@@ -4,6 +4,7 @@ Dependencies:
 * https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/compile_questions.html
 * https://geographiclib.sourceforge.io (You'll also need to install the magnetic model wmm2020)
 * https://github.com/open-source-parsers/jsoncpp
+* https://github.com/mwgg/Airports
 
 Uses cmake so to build (after installing prerequsites)
 * Create a build folder from the top level of the repo.
