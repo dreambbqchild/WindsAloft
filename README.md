@@ -12,6 +12,6 @@ Uses cmake so to build (after installing prerequsites)
 * cmake ..
 * make
 
-Aims to build a flight plan with wind corrections sourced from the GFS weather model (See getData.sh for a pointer script on how to get that). It also uses data on Earth's magnetic field to report deviation values.
+Aims to build a flight plan with wind corrections sourced from the GFS weather model (See getData.sh for a pointer script on how to get that). It also uses data on Earth's magnetic field to report magnetic variation values.
 
 Lastly, this is a research/educational project. If used for actual flight planning, the user would be demonstrating questionable risk management skills, and ADM. So, don't do that eh.
