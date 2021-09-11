@@ -1,7 +1,7 @@
 #!/bin/bash
 
-TIMESTAMP=20210905
-ZHOUR=06
+TIMESTAMP=20210910
+ZHOUR=18
 
 rm -rf ./data
 mkdir data

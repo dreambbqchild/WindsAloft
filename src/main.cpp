@@ -20,13 +20,21 @@ Json::Value LoadAirport(string identifier)
     return result;
 }
 
-void ProcessRoute()
+void ProcessRoute(const char* path)
 {
     Route route;
     Json::Value routeConfig;
-    Load("../route.json", routeConfig);    
+    Load(path, routeConfig);    
     
-    Grib::SetDatabaseTime(DateTime::Parse(routeConfig["takeoff"].asCString()));
+    if(!routeConfig["takeoff"].isNull())
+        Grib::SetDatabaseTime(DateTime::Parse(routeConfig["takeoff"].asCString()));
+
+    if(!routeConfig["minutesUntilDeparture"].isNull())
+    {
+        auto currentTime = Grib::GetDatabaseTime();
+        currentTime.AddMinutes(routeConfig["minutesUntilDeparture"].asDouble());
+        Grib::SetDatabaseTime(currentTime);
+    }
 
     route.SetFrom(routeConfig["from"].asString());
     route.SetTo(routeConfig["to"].asString());
@@ -47,10 +55,17 @@ void ProcessRoute()
     cout << route;
 }
 
-int main()
+int main(int argc, const char* argv[])
 {
     Grib::LoadRegistry();
     LoadAirports();
-    ProcessRoute();
+    cout << "[";
+    for(auto i = 1; i < argc; i++)
+    {
+        ProcessRoute(argv[i]);
+        if(i != argc - 1)
+            cout << ",";
+    }
+    cout << "]" << endl;
     return 0;
 }

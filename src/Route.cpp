@@ -33,13 +33,24 @@ void ManageLowAndHigh(double altitude, const Json::Value& data, Json::Value& low
     }
 }
 
+Json::Value MakeElapsedTime(double minutes)
+{
+    Json::Value elapsed;
+    auto wholeMinute = 0.0;
+    auto fractionalMinutes = modf(minutes, &wholeMinute);
+
+    elapsed["minutes"] = wholeMinute;
+    elapsed["seconds"] = round(fractionalMinutes * 60);
+    return elapsed;
+} 
+
 void Route::InitRoute()
 {
     if(!from.length() || !to.length())
         return;
 
-    result["from"] = LoadAirport("KSYN");
-    result["to"] = LoadAirport("KAEL");
+    result["from"] = LoadAirport(from);
+    result["to"] = LoadAirport(to);
 
     altitude = result["from"]["elevation"].asDouble();
     latFrom = result["from"]["lat"].asDouble();
@@ -114,9 +125,11 @@ void Route::AddCheckpoint(double nm)
     checkpointData["windDir"] = Calc(high, low, "windDir", percentage);
     checkpointData["windSpd"] = Calc(high, low, "windSpd", percentage);
     checkpointData["trueAirspeed"] = Calc(high, low, "trueAirspeed", percentage);
-    checkpointData["minutes"] = nm / ((checkpointData["groundSpd"].asDouble() / 60.0));
+
+    auto minutes = nm / ((checkpointData["groundSpd"].asDouble() / 60.0));
+    checkpointData["elapsed"] = MakeElapsedTime(minutes);
     
-    currentTime.AddMinutes(checkpointData["minutes"].asDouble());
+    currentTime.AddMinutes(minutes);
     checkpointData["time"] = currentTime.ToString();
     Grib::SetDatabaseTime(currentTime);
 
@@ -127,14 +140,15 @@ void Route::AddCheckpoint(double nm)
 
 void Route::AddFinalCheckpoint()
 {
-    AddCheckpoint(MetersToNauticalMiles(line.Distance()) - nmTraveled);
+    altitude = result["to"]["elevation"].asDouble();
+    AddCheckpoint(round(MetersToNauticalMiles(line.Distance()) - nmTraveled));
     result["checkpoints"] = checkpoints;
 }
 
 std::ostream& operator <<(std::ostream& os, Route& route)
 {
     Json::StreamWriterBuilder builder;
-    //builder["indentation"] = "";
+    builder["indentation"] = "";
     unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
 
     writer->write(route.result, &os);

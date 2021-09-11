@@ -102,7 +102,6 @@ double grib_value(const char* variableName, const char* level, double lat, doubl
 
     double result = extractValue(bufsize, buffer);
 
-    puts(buffer);
     free(buffer);
     return result;
 }
