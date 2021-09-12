@@ -61,6 +61,8 @@ void Route::InitRoute()
     result["nm"] = round(DistanceBetween(latFrom, lonFrom, latTo, lonTo));
 
     line = geod.InverseLine(latFrom, lonFrom, latTo, lonTo);
+
+    AddCheckpoint(numeric_limits<double>::epsilon(), "Depart " + from);
 }
 
 Json::Value Route::AddCheckpoint(const char* level, double seaLevelPressure, double lat, double lon)
@@ -90,8 +92,11 @@ Json::Value Route::AddCheckpoint(const char* level, double seaLevelPressure, dou
 	return data;
 }
 
-void Route::AddCheckpoint(double nm)
+void Route::AddCheckpoint(double nm, string name)
 {
+    if(nm == 0)
+        return;
+
     Json::Value low, high;
     Json::Value checkpointData;
 
@@ -100,7 +105,7 @@ void Route::AddCheckpoint(double nm)
 
     auto currentTime = Grib::GetDatabaseTime();
 
-    auto seaLevelPressure = Grib::GetValue(MSL_PRESSURE, MEAN_SEA_LEVEL, lat, lon);    
+    auto seaLevelPressure = Grib::GetValue(MSL_PRESSURE, MEAN_SEA_LEVEL, lat, lon);
     for(auto i = 0; i < TOTAL_LEVELS; i++)
     {
         auto checkpointData = AddCheckpoint(levels[i], seaLevelPressure, lat, lon);
@@ -111,17 +116,18 @@ void Route::AddCheckpoint(double nm)
 	auto percentage = (altitude - low["altitude"].asDouble()) / range;
 
     //Constants given current position
+    checkpointData["name"] = name;
     checkpointData["altitude"] = altitude;
     checkpointData["lat"] = lat;
     checkpointData["lon"] = lon;
     checkpointData["magVar"] = GetMagneticVariation(currentTime.Year(), lat, lon);
     checkpointData["inHg"] = PascalsToInHg(seaLevelPressure);
-    checkpointData["nm"] = nm;
+    checkpointData["nm"] = round(nm);
     checkpointData["trueCourse"] = low["trueCourse"];
 
     //Interpolations
-    checkpointData["WCA"] = Calc(high, low, "WCA", percentage);
-    checkpointData["groundSpd"] = Calc(high, low, "groundSpd", percentage);
+    checkpointData["WCA"] = fmax(0, Calc(high, low, "WCA", percentage));
+    checkpointData["groundSpd"] = fmax(0, Calc(high, low, "groundSpd", percentage));
     checkpointData["temp"] = Calc(high, low, "temp", percentage);
     checkpointData["windDir"] = Calc(high, low, "windDir", percentage);
     checkpointData["windSpd"] = Calc(high, low, "windSpd", percentage);
@@ -129,22 +135,26 @@ void Route::AddCheckpoint(double nm)
 
     checkpointData["heading"] = checkpointData["trueCourse"].asDouble() + checkpointData["magVar"].asDouble() + checkpointData["WCA"].asDouble();
 
-    auto minutes = nm / ((checkpointData["groundSpd"].asDouble() / 60.0));
-    checkpointData["elapsed"] = MakeElapsedTime(minutes);
-    
-    currentTime.AddMinutes(minutes);
+    if(checkpointData["groundSpd"].asDouble())
+    {
+        auto minutes = nm / ((checkpointData["groundSpd"].asDouble() / 60.0));
+        checkpointData["elapsed"] = MakeElapsedTime(minutes);
+        currentTime.AddMinutes(minutes);
+        nmTraveled += nm;
+    }
+    else
+        checkpointData["elapsed"] = MakeElapsedTime(0);
+
     checkpointData["time"] = currentTime.ToString();
     Grib::SetDatabaseTime(currentTime);
 
     checkpoints.append(checkpointData);
-
-    nmTraveled += nm;
 }
 
 void Route::AddFinalCheckpoint()
 {
     altitude = result["to"]["elevation"].asDouble();
-    AddCheckpoint(round(MetersToNauticalMiles(line.Distance()) - nmTraveled));
+    AddCheckpoint(round(MetersToNauticalMiles(line.Distance()) - nmTraveled), "Arrive " + to);
     result["checkpoints"] = checkpoints;
 }
 

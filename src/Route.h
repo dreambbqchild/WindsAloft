@@ -25,7 +25,7 @@ class Route
         inline void SetAltitude(double altitude) { this->altitude = altitude; }
         inline void SetCalibratedAirspeed(double cas) { this->cas = cas; }
 
-        void AddCheckpoint(double nm);
+        void AddCheckpoint(double nm, std::string name);
         void AddFinalCheckpoint();
 
         friend std::ostream& operator <<(std::ostream& os, Route& route);

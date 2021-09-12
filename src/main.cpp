@@ -20,6 +20,13 @@ Json::Value LoadAirport(string identifier)
     return result;
 }
 
+string DefaultCheckpointLabel(int index)
+{
+    stringstream stream;
+    stream << "Checkpoint: " << index;
+    return stream.str();
+}
+
 void ProcessRoute(const char* path)
 {
     Route route;
@@ -39,6 +46,7 @@ void ProcessRoute(const char* path)
     route.SetFrom(routeConfig["from"].asString());
     route.SetTo(routeConfig["to"].asString());
 
+    auto checkpointIndex = 1;
     for(const Json::Value& checkpoint : routeConfig["checkpoints"])
     {
         if(!checkpoint["altitude"].isNull())
@@ -47,7 +55,10 @@ void ProcessRoute(const char* path)
         if(!checkpoint["cas"].isNull())
             route.SetCalibratedAirspeed(checkpoint["cas"].asDouble());
 
-        route.AddCheckpoint(checkpoint["nm"].asDouble());
+        auto name = checkpoint["name"].isNull() ? DefaultCheckpointLabel(checkpointIndex) : checkpoint["name"].asString();
+        route.AddCheckpoint(checkpoint["nm"].asDouble(), name);
+
+        checkpointIndex++;
     }
 
     route.AddFinalCheckpoint();
