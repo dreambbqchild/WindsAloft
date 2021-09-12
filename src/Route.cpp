@@ -74,8 +74,8 @@ Json::Value Route::AddCheckpoint(const char* level, double seaLevelPressure, dou
 	auto iWindDirection = (int)round(windDirection);
 	auto windSpeed = WindSpeed(u, v);
 
-    auto trueCourse = TrueCourse(line, latFrom, latTo, lat, lon);
-	auto trueAirspeed = TrueAirspeed(cas, seaLevelPressure, t);
+    auto trueCourse = TrueCourse(line, latFrom, lonFrom, lat, lon);
+	auto trueAirspeed = TrueAirspeed(cas, seaLevelPressure, t, altitude);
 	auto windCorrectionAngle = WindCorrectionAngle(windDirection, windSpeed, trueAirspeed, trueCourse);
 
     data["altitude"] = (int)round(LabelToAltitude(level, seaLevelPressure));
@@ -117,6 +117,7 @@ void Route::AddCheckpoint(double nm)
     checkpointData["magVar"] = GetMagneticVariation(lat, lon);
     checkpointData["inHg"] = PascalsToInHg(seaLevelPressure);
     checkpointData["nm"] = nm;
+    checkpointData["trueCourse"] = low["trueCourse"];
 
     //Interpolations
     checkpointData["WCA"] = Calc(high, low, "WCA", percentage);
@@ -125,6 +126,8 @@ void Route::AddCheckpoint(double nm)
     checkpointData["windDir"] = Calc(high, low, "windDir", percentage);
     checkpointData["windSpd"] = Calc(high, low, "windSpd", percentage);
     checkpointData["trueAirspeed"] = Calc(high, low, "trueAirspeed", percentage);
+
+    checkpointData["heading"] = checkpointData["trueCourse"].asDouble() + checkpointData["magVar"].asDouble() + checkpointData["WCA"].asDouble();
 
     auto minutes = nm / ((checkpointData["groundSpd"].asDouble() / 60.0));
     checkpointData["elapsed"] = MakeElapsedTime(minutes);

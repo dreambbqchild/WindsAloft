@@ -11,6 +11,11 @@ const double metersInNauticalMile = 1852;
 
 Geodesic geod(Constants::WGS84_a(), Constants::WGS84_f());
 
+inline double PressureLapseRate(double temperature, double pressure) { return 96 * (temperature + 273) / pressure; }	
+inline double PressureAlt(double altitude, double pressure, double lapseRate) { return altitude + (1013 - pressure) * lapseRate; }
+inline double TempISApa(double pressureAlt) { return 15 - (pressureAlt / 1000) * 2; }
+inline double DensityAlt(double pressureAlt, double temperature, double a) { return pressureAlt + 120 * (temperature - a); }
+
 double WindCorrectionAngle(double windDirection, double windSpeed, double trueAirspeed, double trueCourse)
 {
 	trueCourse += 180;
@@ -34,12 +39,19 @@ double GroundSpeed(double windDirection, double windSpeed, double trueHeading, d
 double TrueCourse(const GeodesicLine& line, double lat1, double lon1, double lat2, double lon2)
 {
 	const auto lineFragment = geod.InverseLine(lat1, lon1, lat2, lon2);
-	return lineFragment.Azimuth();
+	auto degrees = lineFragment.Azimuth();
+	if(degrees < 0)
+		degrees += 360;
+	return degrees;
 }
 
-double TrueAirspeed(double indicatedAirspeed, double pressure, double temperature)
+double TrueAirspeed(double indicatedAirspeed, double pressure, double temperature, double altitude)
 {
-	return indicatedAirspeed * sqrt(1.2754 / (pressure / (287.058 * temperature)));
+    temperature = KelvinToCelcius(temperature);
+    pressure *= 0.01;
+    auto pressureAlt = PressureAlt(altitude, pressure, PressureLapseRate(temperature, pressure));
+    auto densityAlt = DensityAlt(pressureAlt, temperature, TempISApa(pressureAlt));    
+    return round(indicatedAirspeed * (1 / pow(pow((288.15 - .0019812 * densityAlt) / 288.15, 1 / .234969), .5)));
 }
 
 int GetMagneticVariation(double lat, double lon)
