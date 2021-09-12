@@ -96,7 +96,7 @@ void Route::AddCheckpoint(double nm)
     Json::Value checkpointData;
 
     double lat = 0, lon = 0;
-    line.Position(NauticalMilesToMeters(nm), lat, lon);
+    line.Position(NauticalMilesToMeters(nmTraveled) + NauticalMilesToMeters(nm), lat, lon);
 
     auto currentTime = Grib::GetDatabaseTime();
 
@@ -114,7 +114,7 @@ void Route::AddCheckpoint(double nm)
     checkpointData["altitude"] = altitude;
     checkpointData["lat"] = lat;
     checkpointData["lon"] = lon;
-    checkpointData["magVar"] = GetMagneticVariation(lat, lon);
+    checkpointData["magVar"] = GetMagneticVariation(currentTime.Year(), lat, lon);
     checkpointData["inHg"] = PascalsToInHg(seaLevelPressure);
     checkpointData["nm"] = nm;
     checkpointData["trueCourse"] = low["trueCourse"];

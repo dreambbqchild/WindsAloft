@@ -54,11 +54,11 @@ double TrueAirspeed(double indicatedAirspeed, double pressure, double temperatur
     return round(indicatedAirspeed * (1 / pow(pow((288.15 - .0019812 * densityAlt) / 288.15, 1 / .234969), .5)));
 }
 
-int GetMagneticVariation(double lat, double lon)
+int GetMagneticVariation(int year, double lat, double lon)
 {
 	MagneticModel mag("wmm2020");
 	double Bx, By, Bz;
-	mag(2021, lat, lon, 0, Bx, By, Bz);
+	mag(year, lat, lon, 0, Bx, By, Bz);
 
 	double H, F, D, I;
 	MagneticModel::FieldComponents(Bx, By, Bz, H, F, D, I);

@@ -8,5 +8,5 @@ double WindCorrectionAngle(double windDirection, double windSpeed, double trueAi
 double GroundSpeed(double windDirection, double windSpeed, double trueHeading, double trueAirspeed);
 double TrueCourse(const GeographicLib::GeodesicLine& line, double lat1, double lon1, double lat2, double lon2);
 double TrueAirspeed(double indicatedAirspeed, double pressure, double temperature, double altitude);
-int GetMagneticVariation(double lat, double lon);
+int GetMagneticVariation(int year, double lat, double lon);
 double DistanceBetween(double lat1, double lon1, double lat2, double lon2);

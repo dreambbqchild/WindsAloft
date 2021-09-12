@@ -21,6 +21,8 @@ struct DateTime
             dateTimeAsTime = mktime(&this->dateTime);
         }
 
+        inline int Year() { return dateTime.tm_year + 1900; }
+
         void AddMinutes(double minutes) 
         {            
             dateTimeAsTime += minutes * 60;
