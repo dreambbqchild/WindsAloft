@@ -68,9 +68,6 @@ void ProcessRoute(const char* path)
 
 int main(int argc, const char* argv[])
 {
-    // cout << GetMagneticVariation(2021, 44.23393032302194, -93.87563083952436) << endl;
-    // return 0;
-
     Grib::LoadRegistry();
     LoadAirports();
     cout << "[";

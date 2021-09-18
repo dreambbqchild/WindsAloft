@@ -1,6 +1,5 @@
 #include "Route.h"
 #include "Grib.h"
-
 using namespace std;
 
 double Calc(Json::Value& high, Json::Value& low, string property, double percentage)
@@ -126,12 +125,15 @@ void Route::AddCheckpoint(double nm, string name)
     checkpointData["trueCourse"] = low["trueCourse"];
 
     //Interpolations
-    checkpointData["WCA"] = fmax(0, Calc(high, low, "WCA", percentage));
     checkpointData["groundSpd"] = fmax(0, Calc(high, low, "groundSpd", percentage));
     checkpointData["temp"] = Calc(high, low, "temp", percentage);
     checkpointData["windDir"] = Calc(high, low, "windDir", percentage);
     checkpointData["windSpd"] = Calc(high, low, "windSpd", percentage);
     checkpointData["trueAirspeed"] = Calc(high, low, "trueAirspeed", percentage);
+    checkpointData["WCA"] = (int)round(WindCorrectionAngle(checkpointData["windDir"].asDouble(),
+        checkpointData["windSpd"].asDouble(), 
+        checkpointData["trueAirspeed"].asDouble(), 
+        checkpointData["trueCourse"].asDouble()));
 
     checkpointData["heading"] = checkpointData["trueCourse"].asDouble() + checkpointData["magVar"].asDouble() + checkpointData["WCA"].asDouble();
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TIMESTAMP=20210911
+TIMESTAMP=20210918
 ZHOUR=06
 
 rm -rf ./data

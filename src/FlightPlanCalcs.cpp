@@ -7,6 +7,7 @@
 using namespace std;
 using namespace GeographicLib;
 
+const double radians = M_PI / 180;
 const double metersInNauticalMile = 1852;
 
 Geodesic geod(Constants::WGS84_a(), Constants::WGS84_f());
@@ -18,14 +19,15 @@ inline double DensityAlt(double pressureAlt, double temperature, double a) { ret
 
 double WindCorrectionAngle(double windDirection, double windSpeed, double trueAirspeed, double trueCourse)
 {
-	trueCourse += 180;
-
-	auto awaHeadwind = windDirection - 180 - trueCourse;
-	auto awaTailwind = trueCourse - windDirection;
-	auto awa = abs(awaHeadwind) < abs(awaTailwind) ? awaHeadwind : awaTailwind;
-	auto awaRadians = awa * Math::degree();
-
-	return asin((windSpeed * sin(awaRadians)) / trueAirspeed) / Math::degree();
+	if(!trueAirspeed)
+		return 0;
+	
+	auto radianCourse = radians * ((int)round(trueCourse) % 360);
+	auto radianWindDir = radians * windDirection;
+	auto c = windSpeed / trueAirspeed * sin(radianWindDir - radianCourse);
+	auto l = radianCourse + asin(c);
+	
+	return 1 / radians * (-1 * atan2(windSpeed * sin(l - radianWindDir), trueAirspeed - windSpeed * cos(l - radianWindDir)));
 }
 
 double GroundSpeed(double windDirection, double windSpeed, double trueHeading, double trueAirspeed)
